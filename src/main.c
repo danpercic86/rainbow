@@ -4,52 +4,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdbool.h>
-
-#define STRING_TERMINATOR '\0'
-#define ALLOC(var, Type) if((var = malloc(sizeof(Type))) == NULL) err(-1, "Not enough memory");
-#define ALLOC_LEN(var, Type, length) if((var = malloc(sizeof(Type) * length)) == NULL) err(-1, "Not enough memory");
-#define REALLOC(ptr, Type, length) if((ptr = realloc(ptr, sizeof(Type) * length)) == NULL) err(-1, "Not enough memory");
-
-enum Type {
-    ID,
-    INT,
-    REAL,
-    STR,
-    VAR,
-    IF,
-    ELSE,
-    WHILE,
-    END,
-    RETURN,
-    FUNCTION,
-    COLON,
-    SEMICOLON,
-    LPAR,
-    RPAR,
-    COMMA,
-    OR,
-    AND,
-    NOT,
-    NOTEQUAL,
-    EQUAL,
-    ASSIGN,
-    LESS,
-    ADD,
-    SUB,
-    MUL,
-    DIV,
-    FINISH
-};
-
-typedef struct {
-    enum Type type;
-    int line;
-    union {
-        char* string;
-        double real;
-        long integer;
-    };
-} Atom;
+#include "main.h"
 
 Atom** atoms;
 int atomsNumber = 0;
@@ -83,7 +38,7 @@ Atom* getNextAtom() {
     ALLOC(buffer, char)
 
     while (true) {
-        printf("#%d %c(%d)\n", state, ch, ch);
+        printf("# State: %d | Char: '%c' (%d)\n", state, ch, ch);
 
         switch (state) {
         case 0:
@@ -353,7 +308,7 @@ int main() {
     while (getNextAtom()->type != FINISH) { ++pch; }
 
     for (int i = 0; i < atomsNumber; i++) {
-        printf("%d ", atoms[i]->type);
+        printf("%s ", TYPES[atoms[i]->type]);
     }
 
     free(fileContent);
