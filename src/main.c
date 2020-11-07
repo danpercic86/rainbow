@@ -24,9 +24,9 @@ Atom* addAtom(const enum Type type) {
 }
 
 char* addCharToBuffer(char* buffer, int* length, const char* value) {
-    (*length)++;
-    REALLOC(buffer, char, *length)
+    REALLOC(buffer, char, *length + 1)
     buffer[*length] = *value;
+    (*length)++;
     return buffer;
 }
 
@@ -42,234 +42,239 @@ Atom* getNextAtom() {
 
         switch (state) {
         case 0:
-            if (isalpha(ch) || ch == '_') {
+            if (ch == '#') {
                 state = 1;
-                buffer = addCharToBuffer(buffer, &bufferLength, &ch);
-                ch = *++pch;
+                break;
             }
-            else if (isdigit(ch) || ch == '.') {
+
+            if (isalpha(ch) || ch == '_') {
+                state = 2;
+                break;
+            }
+
+            if (ch == '\"') {
                 state = 3;
+                ch = *++pch;
+                break;
+            }
+
+            if (isdigit(ch)) {
+                state = 5;
                 buffer = addCharToBuffer(buffer, &bufferLength, &ch);
                 ch = *++pch;
+                break;
             }
-            else if (ch == '\"')
-                state = 8;
-            else if (ch == ':')
-                state = 10;
+
+            if (ch == ':')
+                state = 7;
             else if (ch == ';')
-                state = 11;
+                state = 8;
             else if (ch == '(')
-                state = 12;
+                state = 9;
             else if (ch == ')')
-                state = 13;
+                state = 10;
             else if (ch == ',')
-                state = 14;
+                state = 11;
             else if (ch == '|')
-                state = 15;
+                state = 12;
             else if (ch == '&')
-                state = 17;
-            else if (ch == '!')
-                state = 19;
+                state = 13;
             else if (ch == '=')
-                state = 23;
+                state = 14;
+            else if (ch == '!')
+                state = 16;
             else if (ch == '<')
-                state = 26;
+                state = 18;
             else if (ch == '+')
-                state = 27;
+                state = 19;
             else if (ch == '-')
-                state = 28;
+                state = 20;
             else if (ch == '*')
-                state = 29;
+                state = 21;
             else if (ch == '/')
-                state = 30;
+                state = 22;
             else if (ch == STRING_TERMINATOR)
-                state = 31;
+                state = 23;
             else if (ch == ' ' || ch == '\n' || ch == '\r' || ch == '\t') {
                 if (ch == '\n')
                     line++;
                 ch = *++pch;
             }
-            else {
-                err(-1, "Unknown character: %c", ch);
-            }
+            else err(-1, "Unknown character: %c", ch);
+
             break;
         case 1:
-            if (isalpha(ch) || ch == '_') {
-                buffer = addCharToBuffer(buffer, &bufferLength, &ch);
-                ch = *++pch;
+            // case COMMENT: read next characters until new line encountered
+            if (ch == '\n') {
+                line++;
+                state = 0;
             }
-            else {
-                pch--;
-                state = 2;
-            }
+
+            ch = *++pch;
             break;
         case 2:
-            buffer[bufferLength] = STRING_TERMINATOR;
-            if (strcmp(buffer, "var") == 0) {
-                return addAtom(VAR);
+            // case ID
+            if (isalpha(ch) || ch == '_' || isdigit(ch)) {
+                buffer = addCharToBuffer(buffer, &bufferLength, &ch);
+                ch = *++pch;
+                break;
             }
-            else if (strcmp(buffer, "function") == 0) {
-                return addAtom(FUNCTION);
-            }
-            else if (strcmp(buffer, "if") == 0) {
-                return addAtom(IF);
-            }
-            else if (strcmp(buffer, "else") == 0) {
-                return addAtom(ELSE);
-            }
-            else if (strcmp(buffer, "while") == 0) {
-                return addAtom(WHILE);
-            }
-            else if (strcmp(buffer, "end") == 0) {
-                return addAtom(END);
-            }
-            else if (strcmp(buffer, "return") == 0) {
-                return addAtom(RETURN);
-            }
-            else if (strcmp(buffer, "int") == 0) {
-                return addAtom(INT);
-            }
-            else if (strcmp(buffer, "real") == 0) {
-                return addAtom(REAL);
-            }
-            else if (strcmp(buffer, "str") == 0) {
-                return addAtom(STR);
-            }
-            else {
-                atom = addAtom(ID);
-                ALLOC_LEN(atom->string, char, bufferLength)
-                strcpy(atom->string, buffer);
-                return atom;
-            }
+
+            pch--;
+            state = ADD_ATOM_STATE;
+            break;
         case 3:
-            if (isdigit(ch)) {
-                buffer = addCharToBuffer(buffer, &bufferLength, &ch);
-                ch = *++pch;
-            }
-            else if (ch == '.') {
-                state = 5;
-                buffer = addCharToBuffer(buffer, &bufferLength, &ch);
-                ch = *++pch;
-            }
-            else {
-                pch--;
-                state = 4;
-            }
-            break;
-        case 4:
-            atom = addAtom(INT);
-            buffer[bufferLength] = STRING_TERMINATOR;
-            atom->integer = strtol(buffer, NULL, 10);
-            return atom;
-        case 5:
-            if (isdigit(ch)) {
-                state = 6;
-                buffer = addCharToBuffer(buffer, &bufferLength, &ch);
-                ch = *++pch;
-            }
-            else err(-1, "caracter necunoscut - lipsesc zecimale dintr-un numar real");
-            break;
-        case 6:
-            if (isdigit(ch)) {
-                buffer = addCharToBuffer(buffer, &bufferLength, &ch);
-                ch = *++pch;
-            }
-            else {
-                pch--;
-                state = 7;
-            }
-            break;
-        case 7:
-            buffer[bufferLength] = STRING_TERMINATOR;
-            atom = addAtom(REAL);
-            atom->real = strtod(buffer, NULL);
-            return atom;
-        case 8:
+            // case STRING
             if (ch != '\"') {
                 buffer = addCharToBuffer(buffer, &bufferLength, &ch);
                 ch = *++pch;
+                break;
             }
-            else {
-                pch--;
-                state = 9;
-            }
+
+            state = 4;
             break;
-        case 9:
+        case 4:
             buffer[bufferLength] = STRING_TERMINATOR;
             atom = addAtom(STR);
             ALLOC_LEN(atom->string, char, bufferLength)
             strcpy(atom->string, buffer);
             return atom;
-        case 10:
+        case 5:
+            if (isdigit(ch)) {
+                buffer = addCharToBuffer(buffer, &bufferLength, &ch);
+                ch = *++pch;
+                break;
+            }
+
+            if (ch == '.') {
+                state = 6;
+                break;
+            }
+
+            pch--;
+            atom = addAtom(INT);
+            buffer[bufferLength] = STRING_TERMINATOR;
+            atom->integer = strtol(buffer, NULL, 10);
+            return atom;
+        case 6:
+            if (ch == '.') {
+                buffer = addCharToBuffer(buffer, &bufferLength, &ch);
+                ch = *++pch;
+                if (ch == '.') {
+                    err(-1, "Too many dots!");
+                }
+            }
+
+            if (isdigit(ch)) {
+                buffer = addCharToBuffer(buffer, &bufferLength, &ch);
+                ch = *++pch;
+                break;
+            }
+
+            pch--;
+            buffer[bufferLength] = STRING_TERMINATOR;
+            atom = addAtom(REAL);
+            atom->real = strtod(buffer, NULL);
+            return atom;
+        case 7:
             return addAtom(COLON);
-        case 11:
+        case 8:
             return addAtom(SEMICOLON);
-        case 12:
+        case 9:
             return addAtom(LPAR);
-        case 13:
+        case 10:
             return addAtom(RPAR);
-        case 14:
+        case 11:
             return addAtom(COMMA);
-        case 15:
+        case 12:
+            ch = *++pch;
             if (ch == '|') {
-                pch--;
-                state = 16;
+                return addAtom(OR);
             }
-            else {
-                err(-1, "caracter necunoscut - un singur |");
-            }
-            break;
-        case 16:
-            return addAtom(OR);
-        case 17:
+
+            err(-1, "Unknown character after '|'!");
+        case 13:
+            ch = *++pch;
             if (ch == '&') {
-                pch--;
-                state = 18;
+                return addAtom(AND);
             }
-            else {
-                err(-1, "caracter necunoscut - un singur &");
+
+            err(-1, "Unknown character after '&'!");
+        case 14:
+            ch = *++pch;
+
+            if (ch == '=') {
+                state = 15;
+                break;
             }
-            break;
-        case 18:
-            return addAtom(AND);
-        case 19:
-            if (ch == '=')
-                state = 21;
-            else {
-                state = 20;
-            }
+
             pch--;
-            break;
-        case 20:
-            return addAtom(NOT);
-        case 21:
-            return addAtom(NOTEQUAL);
-        case 23:
-            if (ch == '=')
-                state = 25;
-            else {
-                state = 24;
-            }
-            pch--;
-            break;
-        case 24:
             return addAtom(ASSIGN);
-        case 25:
+        case 15:
             return addAtom(EQUAL);
-        case 26:
+        case 16:
+            ch = *++pch;
+
+            if (ch == '=') {
+                state = 17;
+                break;
+            }
+
+            pch--;
+            return addAtom(NOT);
+        case 17:
+            return addAtom(NOTEQUAL);
+        case 18:
             return addAtom(LESS);
-        case 27:
+        case 19:
             return addAtom(ADD);
-        case 28:
+        case 20:
             return addAtom(SUB);
-        case 29:
+        case 21:
             return addAtom(MUL);
-        case 30:
+        case 22:
             return addAtom(DIV);
-        case 31:
+        case 23:
             return addAtom(FINISH);
+        case ADD_ATOM_STATE:
+            buffer[bufferLength] = STRING_TERMINATOR;
+            if (strcmp(buffer, "var") == 0) {
+                return addAtom(VAR);
+            }
+            if (strcmp(buffer, "function") == 0) {
+                return addAtom(FUNCTION);
+            }
+            if (strcmp(buffer, "if") == 0) {
+                return addAtom(IF);
+            }
+            if (strcmp(buffer, "else") == 0) {
+                return addAtom(ELSE);
+            }
+            if (strcmp(buffer, "while") == 0) {
+                return addAtom(WHILE);
+            }
+            if (strcmp(buffer, "end") == 0) {
+                return addAtom(END);
+            }
+            if (strcmp(buffer, "return") == 0) {
+                return addAtom(RETURN);
+            }
+            if (strcmp(buffer, "int") == 0) {
+                return addAtom(TYPE_INT);
+            }
+            if (strcmp(buffer, "real") == 0) {
+                return addAtom(TYPE_REAL);
+            }
+            if (strcmp(buffer, "str") == 0) {
+                return addAtom(TYPE_STR);
+            }
+
+            atom = addAtom(ID);
+            ALLOC_LEN(atom->string, char, bufferLength)
+            strcpy(atom->string, buffer);
+            return atom;
         default:
-            err(0, "s-a ajuns intr-o stare neprevazuta");
+            err(0, "Unknown state!");
             break;
         }
     }
@@ -307,10 +312,32 @@ int main() {
 
     while (getNextAtom()->type != FINISH) { ++pch; }
 
+    printf("\n");
+    int currentLine = 1;
     for (int i = 0; i < atomsNumber; i++) {
-        printf("%s ", TYPES[atoms[i]->type]);
+        if (currentLine != atoms[i]->line) {
+            printf("\n");
+            currentLine = atoms[i]->line;
+        }
+
+        switch (atoms[i]->type) {
+        case ID:
+            printf("ID:%s ", atoms[i]->string);
+            break;
+        case STR:
+            printf("STR:%s ", atoms[i]->string);
+            break;
+        case REAL:
+            printf("REAL:%f ", atoms[i]->real);
+            break;
+        case INT:
+            printf("INT:%ld ", atoms[i]->integer);
+            break;
+        default:
+            printf("%s ", TYPES[atoms[i]->type - TYPE_OFFSET]);
+        }
     }
 
     free(fileContent);
-    printf("Done!");
+    printf("\n\nDone!");
 }
