@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include <stdbool.h>
 #include "main.h"
 
 Atom** atoms;
@@ -39,7 +38,7 @@ Atom* getNextAtom()
     Atom* atom = NULL;
     ALLOC(buffer, char)
 
-    while (true)
+    for ever
     {
         printf("# State: %d | Char: '%c' (%d)\n", state, ch, ch);
 
@@ -149,7 +148,7 @@ Atom* getNextAtom()
             break;
         case 1:
             // case COMMENT: read next characters until new line encountered
-            if (ch == '\n' || ch == '\r' || ch == '\t')
+            if (ch == '\n' || ch == '\r' || ch == '\0')
             {
                 state = 0;
                 if (ch == '\n')
@@ -388,7 +387,7 @@ int main()
     rewind(file);
 
     fileContent = calloc(sizeof(char), fileSize + 1);
-    if (!fileContent)
+    if (not fileContent)
     {
         free(fileContent);
         fclose(file);
@@ -413,6 +412,7 @@ int main()
     printf("\n");
     int currentLine = 1;
     printf("%d ", currentLine);
+
     for (int i = 0; i < atomsNumber; i++)
     {
         if (currentLine != atoms[i]->line)
