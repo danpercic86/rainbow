@@ -5,7 +5,6 @@
 #include <stdlib.h>
 #include "main.h"
 
-Atom** atoms;
 int atomsNumber = 0;
 char* fileContent;
 char* pch;
@@ -13,13 +12,13 @@ int line = 1;
 
 Atom* addAtom(const enum Type type)
 {
-    Atom* atom;
-    ALLOC(atom, Atom)
-    atom->type = type;
-    atom->line = line;
+    Atom* currentAtom;
+    ALLOC(currentAtom, Atom)
+    currentAtom->type = type;
+    currentAtom->line = line;
     REALLOC(atoms, Atom, (atomsNumber + 1))
-    atoms[atomsNumber++] = atom;
-    return atom;
+    atoms[atomsNumber++] = currentAtom;
+    return currentAtom;
 }
 
 char* addCharToBuffer(char* buffer, int* length, const char* value)
@@ -35,7 +34,7 @@ Atom* getNextAtom()
     int state = 0, bufferLength = 0;
     char* buffer;
     char ch = *pch;
-    Atom* atom = NULL;
+    Atom* currentAtom = NULL;
     ALLOC(buffer, char)
 
     for ever
@@ -138,6 +137,7 @@ Atom* getNextAtom()
                 {
                     line++;
                 }
+
                 ch = *++pch;
             }
             else
@@ -151,6 +151,7 @@ Atom* getNextAtom()
             if (ch == '\n' || ch == '\r' || ch == '\0')
             {
                 state = 0;
+
                 if (ch == '\n')
                 {
                     line++;
@@ -215,10 +216,10 @@ Atom* getNextAtom()
                 return addAtom(TYPE_STR);
             }
 
-            atom = addAtom(ID);
-            ALLOC_LEN(atom->string, char, bufferLength)
-            strcpy(atom->string, buffer);
-            return atom;
+            currentAtom = addAtom(ID);
+            ALLOC_LEN(currentAtom->string, char, bufferLength)
+            strcpy(currentAtom->string, buffer);
+            return currentAtom;
         case 4:
             // case STRING
             if (ch != '\"')
@@ -232,10 +233,10 @@ Atom* getNextAtom()
             break;
         case 5:
             buffer[bufferLength] = STRING_TERMINATOR;
-            atom = addAtom(STR);
-            ALLOC_LEN(atom->string, char, bufferLength)
-            strcpy(atom->string, buffer);
-            return atom;
+            currentAtom = addAtom(STR);
+            ALLOC_LEN(currentAtom->string, char, bufferLength)
+            strcpy(currentAtom->string, buffer);
+            return currentAtom;
         case 6:
             if (isdigit(ch))
             {
@@ -251,10 +252,10 @@ Atom* getNextAtom()
             }
 
             pch--;
-            atom = addAtom(INT);
+            currentAtom = addAtom(INT);
             buffer[bufferLength] = STRING_TERMINATOR;
-            atom->integer = strtol(buffer, NULL, 10);
-            return atom;
+            currentAtom->integer = strtol(buffer, NULL, 10);
+            return currentAtom;
         case 7:
             if (ch == '.')
             {
@@ -286,9 +287,9 @@ Atom* getNextAtom()
             break;
         case 9:
             buffer[bufferLength] = STRING_TERMINATOR;
-            atom = addAtom(REAL);
-            atom->real = strtod(buffer, NULL);
-            return atom;
+            currentAtom = addAtom(REAL);
+            currentAtom->real = strtod(buffer, NULL);
+            return currentAtom;
         case 11:
             return addAtom(COLON);
         case 12:
@@ -407,7 +408,9 @@ int main()
     pch = fileContent;
 
     while (getNextAtom()->type != FINISH)
-    { ++pch; }
+    {
+        ++pch;
+    }
 
     printf("\n");
     int currentLine = 1;
@@ -442,5 +445,9 @@ int main()
     }
 
     free(fileContent);
+    printf("\n");
+
+    program();
+
     printf("\n\nDone!");
 }

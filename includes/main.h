@@ -6,6 +6,7 @@
 #define RAINBOW_MAIN_H
 
 #include <stdbool.h>
+#include <errno.h>
 
 #define STRING_TERMINATOR '\0'
 #define ALLOC(var, Type) if((var = malloc(sizeof(Type))) == NULL) err(-1, "Not enough memory");
@@ -14,7 +15,6 @@
 #define TYPE_OFFSET 99
 #define ever (;;)
 #define or ||
-#define and &&
 #define not !
 
 enum Type
@@ -70,53 +70,57 @@ typedef struct
     };
 } Atom;
 
-Atom* pa;
+Atom** atoms;
+Atom* atom;
+int idx = 0;
 
-bool exprAdunare();
+bool addExpression();
 
-bool instr();
+bool instruction();
 
 bool error(const char* msg)
 {
-    err(-1, "%s", msg);
+    err(1, "\n%s\nLine: %d", msg, atom->line);
 }
 
-bool consume(int type)
+bool incrementIndex()
 {
-    if (pa->type == type)
-    {
-        pa++;
-        return true;
-    }
-
-    return false;
+    printf("--- consumed: %s\n", TYPES[atom->type - TYPE_OFFSET]);
+    idx++;
+    return true;
 }
 
-bool exprComp()
+bool consume(const enum Type type)
 {
-    if (not exprAdunare())
+    atom = atoms[idx];
+    return atom->type == type ? incrementIndex() : false;
+}
+
+bool complexExpression()
+{
+    if (not addExpression())
     {
         return false;
     }
 
     if (consume(LESS))
     {
-        if (exprAdunare())
+        if (addExpression())
         {
             return true;
         }
 
-        error("lipsa exprAdunare dupa LESS");
+        error("missing ADD expression after LESS");
     }
 
     if (consume(EQUAL))
     {
-        if (exprAdunare())
+        if (addExpression())
         {
             return true;
         }
 
-        error("lipsa exprAdunare dupa EQUAL");
+        error("missing ADD expression after EQUAL");
     }
 
     return true;
@@ -127,20 +131,20 @@ bool baseType()
     return consume(TYPE_INT) or consume(TYPE_REAL) or consume(TYPE_STR);
 }
 
-bool exprAtribuire()
+bool assignExpression()
 {
     if (not consume(ID))
     {
-        return exprComp();
+        return complexExpression();
     }
 
     if (not consume(ASSIGN))
     {
-        pa--;
-        return exprComp();
+        idx--;
+        return complexExpression();
     }
 
-    if (not exprComp())
+    if (not complexExpression())
     {
         error("expression is missing after ASSIGN operator!");
     }
@@ -150,21 +154,23 @@ bool exprAtribuire()
 
 bool block()
 {
-    if (not instr())
+    if (not instruction())
     {
         return false;
     }
 
     for ever
     {
-        if (not instr())
-        { return true; }
+        if (not instruction())
+        {
+            return true;
+        }
     }
 }
 
-bool exprLogica()
+bool logicExpression()
 {
-    if (not exprAtribuire())
+    if (not assignExpression())
     {
         return false;
     }
@@ -173,9 +179,9 @@ bool exprLogica()
     {
         if (consume(AND))
         {
-            if (not exprAtribuire())
+            if (not assignExpression())
             {
-                error("lipseste exprAtribuire dupa AND");
+                error("missing ASSIGN expression after AND");
             }
 
             continue;
@@ -183,9 +189,9 @@ bool exprLogica()
 
         if (consume(OR))
         {
-            if (not exprAtribuire())
+            if (not assignExpression())
             {
-                error("lipseste exprAtribuire dupa OR");
+                error("missing ASSIGN expression after OR");
             }
 
             continue;
@@ -195,7 +201,7 @@ bool exprLogica()
     }
 }
 
-bool funcArgs()
+bool functionArguments()
 {
     if (not consume(ID))
     {
@@ -219,9 +225,9 @@ bool funcArgs()
             return true;
         }
 
-        if (not funcArgs())
+        if (not functionArguments())
         {
-            error("There's an unexpected comma in the function arguments!");
+            error("there's an unexpected comma in the function arguments!");
         }
     }
 }
@@ -235,14 +241,14 @@ bool factor()
 
     if (consume(LPAR))
     {
-        if (not exprLogica())
+        if (not logicExpression())
         {
-            error("expresie gresita intre paranteze");
+            error("wrong expression between parentheses");
         }
 
         if (not consume(RPAR))
         {
-            error("lipsa paranteza dreapta");
+            error("missing right parenthesis in factor");
         }
 
         return true;
@@ -258,43 +264,43 @@ bool factor()
         return true;
     }
 
-    if (exprLogica())
+    if (logicExpression())
     {
         for ever
         {
-            if (consume(COMMA))
+            if (not consume(COMMA))
             {
                 break;
             }
 
-            if (not exprLogica())
+            if (not logicExpression())
             {
-                error("lipsa expresie dupa virgula");
+                error("missing expression after comma");
             }
         }
     }
 
-    return consume(RPAR) ? true : error("lipsa paranteza dreapta");
+    return consume(RPAR) ? true : error("missing right parenthesis at factor final");
 }
 
-bool exprPrefix()
+bool prefixedExpression()
 {
     if (consume(SUB))
     {
-        return factor() ? true : error("lipsa factor dupa SUB");
+        return factor() ? true : error("missing factor after SUB");
     }
 
     if (consume(NOT))
     {
-        return factor() ? true : error("lipsa factor dupa NOT");
+        return factor() ? true : error("missing factor after NOT");
     }
 
     return factor();
 }
 
-bool exprInmultire()
+bool multiplyExpression()
 {
-    if (not exprPrefix())
+    if (not prefixedExpression())
     {
         return false;
     }
@@ -303,9 +309,9 @@ bool exprInmultire()
     {
         if (consume(MUL))
         {
-            if (not exprPrefix())
+            if (not prefixedExpression())
             {
-                error("lipsa exprPrefix dupa MUL");
+                error("missing prefixed expression after MUL");
             }
 
             continue;
@@ -313,9 +319,9 @@ bool exprInmultire()
 
         if (consume(DIV))
         {
-            if (not exprPrefix())
+            if (not prefixedExpression())
             {
-                error("lipsa exprPrefix dupa DIV");
+                error("missing prefixed expression after DIV");
             }
 
             continue;
@@ -325,9 +331,9 @@ bool exprInmultire()
     }
 }
 
-bool exprAdunare()
+bool addExpression()
 {
-    if (not exprInmultire())
+    if (not multiplyExpression())
     {
         return false;
     }
@@ -336,9 +342,9 @@ bool exprAdunare()
     {
         if (consume(ADD))
         {
-            if (not exprInmultire())
+            if (not multiplyExpression())
             {
-                error("lipsa exprInmultire dupa ADD");
+                error("missing multiply expression after ADD");
             }
 
             continue;
@@ -346,9 +352,9 @@ bool exprAdunare()
 
         if (consume(SUB))
         {
-            if (not exprInmultire())
+            if (not multiplyExpression())
             {
-                error("lipsa exprInmultire dupa SUB");
+                error("missing multiply expression after SUB");
             }
 
             continue;
@@ -358,56 +364,56 @@ bool exprAdunare()
     }
 }
 
-bool instr()
+bool instruction()
 {
-    if (exprLogica())
+    if (logicExpression())
     {
-        return consume(SEMICOLON) ? true : error("expresie neterminata de ;");
+        return consume(SEMICOLON) ? true : error("expression has no ; at the end");
     }
 
     if (consume(IF))
     {
         if (not consume(LPAR))
         {
-            error("lipsa paranteza stanga");
+            error("missing left parenthesis");
         }
 
-        if (not exprLogica())
+        if (not logicExpression())
         {
-            error("lipsa expresie in if");
+            error("missing expression in if");
         }
 
         if (not consume(RPAR))
         {
-            error("lipsa paranteza dreapta");
+            error("missing right parenthesis");
         }
 
         if (not block())
         {
-            error("lipsa block din if");
+            error("missing block in if");
         }
 
         if (not consume(ELSE))
         {
-            return consume(END) ? true : error("lipseste END la finalul if");
+            return consume(END) ? true : error("missing END at the IF final");
         }
 
         if (not block())
         {
-            error("lipsa block la ramura ELSE");
+            error("missing block in ELSE branch");
         }
 
-        return consume(END) ? true : error("lipseste END dupa ramura ELSE");
+        return consume(END) ? true : error("missing END after ELSE branch");
     }
 
     if (consume(RETURN))
     {
-        if (not exprLogica())
+        if (not logicExpression())
         {
-            error("lipsa expresie");
+            error("expression is missing");
         }
 
-        return consume(SEMICOLON) ? true : error("lipsa ;");
+        return consume(SEMICOLON) ? true : error("; is missing");
     }
 
     if (not consume(WHILE))
@@ -417,32 +423,32 @@ bool instr()
 
     if (not consume(LPAR))
     {
-        error("lipsa paranteza stanga la while");
+        error("missing left parenthesis in WHILE");
     }
 
-    if (not exprLogica())
+    if (not logicExpression())
     {
-        error("lipsa expresie in while");
+        error("missing expression in WHILE");
     }
 
     if (not consume(RPAR))
     {
-        error("lipsa paranteza dreapta la while");
+        error("missing right parenthesis in WHILE");
     }
 
     if (not block())
     {
-        error("lipsa block din interiorul while");
+        error("missing block in WHILE");
     }
 
-    return consume(END) ? true : error("lipsa END la finalul WHILE");
+    return consume(END) ? true : error("missing END at the end of WHILE");
 }
 
-bool declVar()
+bool variableDeclaration()
 {
     if (not consume(VAR))
     {
-        error("var is missing!");
+        return false;
     }
 
     if (not consume(ID))
@@ -463,7 +469,7 @@ bool declVar()
     return consume(SEMICOLON) ? true : error("; is missing!");
 }
 
-bool declFunc()
+bool functionDeclaration()
 {
     if (not consume(FUNCTION))
     {
@@ -480,7 +486,7 @@ bool declFunc()
         error("( is missing!");
     }
 
-    if (not funcArgs())
+    if (not functionArguments())
     {
         error("function arguments are missing!");
     }
@@ -500,13 +506,7 @@ bool declFunc()
         error("the base type is missing!");
     }
 
-    for ever
-    {
-        if (not declVar())
-        {
-            break;
-        }
-    }
+    for ever if (not variableDeclaration()) break;
 
     if (not block())
     {
@@ -518,9 +518,11 @@ bool declFunc()
 
 bool program()
 {
+    atom = atoms[idx];
+
     for ever
     {
-        if (declVar() or declFunc() or block())
+        if (variableDeclaration() or functionDeclaration() or block())
         {
             continue;
         }
